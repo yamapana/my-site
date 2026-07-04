@@ -1,0 +1,493 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <title>カウントダウン</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Helvetica Neue", sans-serif;
+      background: #f5f5f7;
+      margin: 0;
+      padding: 20px;
+      color: #222;
+    }
+
+    header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 20px;
+    }
+
+    h1 {
+      margin: 0;
+      font-size: 26px;
+    }
+
+    a {
+      color: #007aff;
+      text-decoration: none;
+    }
+
+    .card {
+      background: white;
+      border-radius: 16px;
+      padding: 16px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+      margin-bottom: 16px;
+    }
+
+    .form-grid {
+      display: grid;
+      grid-template-columns: 1.5fr 1fr 1fr auto;
+      gap: 10px;
+      align-items: center;
+    }
+
+    input, select, button {
+      font-size: 16px;
+      padding: 10px;
+      border-radius: 10px;
+      border: 1px solid #ccc;
+      box-sizing: border-box;
+    }
+
+    button {
+      background: #007aff;
+      color: white;
+      border: none;
+      cursor: pointer;
+      white-space: nowrap;
+    }
+
+    button.secondary {
+      background: #e5e5ea;
+      color: #222;
+    }
+
+    button.danger {
+      background: #ff3b30;
+      color: white;
+    }
+
+    button:disabled {
+      opacity: 0.4;
+      cursor: not-allowed;
+    }
+
+    .controls {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      align-items: center;
+      margin-bottom: 16px;
+    }
+
+    .task-list {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .task-row {
+      display: grid;
+      grid-template-columns: 60px 1.4fr 40px 1fr 1.2fr 120px 120px;
+      gap: 8px;
+      align-items: center;
+      background: white;
+      border-radius: 14px;
+      padding: 12px;
+      box-shadow: 0 3px 10px rgba(0,0,0,0.06);
+    }
+
+    .task-name {
+      font-weight: bold;
+      font-size: 17px;
+      overflow-wrap: anywhere;
+    }
+
+    .made {
+      color: #777;
+      text-align: center;
+    }
+
+    .target-time {
+      color: #666;
+      font-size: 14px;
+    }
+
+    .remaining {
+      font-weight: bold;
+      font-size: 17px;
+      text-align: right;
+    }
+
+    .move-buttons {
+      display: flex;
+      gap: 4px;
+    }
+
+    .move-buttons button,
+    .small-btn {
+      padding: 7px 9px;
+      font-size: 14px;
+      border-radius: 8px;
+    }
+
+    .row-actions {
+      display: flex;
+      gap: 6px;
+    }
+
+    .empty {
+      color: #777;
+      text-align: center;
+      padding: 24px;
+    }
+
+    dialog {
+      border: none;
+      border-radius: 16px;
+      padding: 18px;
+      width: min(92vw, 420px);
+      box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+    }
+
+    dialog::backdrop {
+      background: rgba(0,0,0,0.35);
+    }
+
+    .dialog-form {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .dialog-buttons {
+      display: flex;
+      justify-content: flex-end;
+      gap: 8px;
+      margin-top: 8px;
+    }
+
+    @media (max-width: 820px) {
+      .form-grid {
+        grid-template-columns: 1fr;
+      }
+
+      .task-row {
+        grid-template-columns: 1fr;
+      }
+
+      .made,
+      .target-time,
+      .remaining {
+        text-align: left;
+      }
+
+      .row-actions,
+      .move-buttons {
+        display: flex;
+      }
+    }
+  </style>
+</head>
+
+<body>
+
+  <header>
+    <h1>カウントダウン</h1>
+    <a href="./">← ホームへ</a>
+  </header>
+
+  <section class="card">
+    <h2>タスク追加</h2>
+
+    <div class="form-grid">
+      <input id="taskName" type="text" placeholder="タスク名 例：研究MT">
+      <input id="taskDate" type="date">
+      <input id="taskTime" type="time">
+      <button onclick="addTask()">追加</button>
+    </div>
+  </section>
+
+  <section class="controls">
+    <label>
+      表示：
+      <select id="displayMode" onchange="saveSettings(); renderTasks();">
+        <option value="time">時間で表示</option>
+        <option value="date">日にちで表示</option>
+      </select>
+    </label>
+
+    <label>
+      並び替え：
+      <select id="sortMode" onchange="saveSettings(); renderTasks();">
+        <option value="nearest">近い順</option>
+        <option value="input">入力順</option>
+        <option value="custom">カスタム</option>
+      </select>
+    </label>
+  </section>
+
+  <section id="taskList" class="task-list"></section>
+
+  <dialog id="editDialog">
+    <h2>タスク編集</h2>
+
+    <div class="dialog-form">
+      <input id="editName" type="text" placeholder="タスク名">
+      <input id="editDate" type="date">
+      <input id="editTime" type="time">
+
+      <div class="dialog-buttons">
+        <button class="secondary" onclick="closeEditDialog()">キャンセル</button>
+        <button onclick="saveEditTask()">保存</button>
+      </div>
+    </div>
+  </dialog>
+
+  <script>
+    let tasks = JSON.parse(localStorage.getItem("countdownTasks")) || [];
+    let editingTaskId = null;
+
+    const displayModeSelect = document.getElementById("displayMode");
+    const sortModeSelect = document.getElementById("sortMode");
+
+    const savedSettings = JSON.parse(localStorage.getItem("countdownSettings")) || {};
+    displayModeSelect.value = savedSettings.displayMode || "time";
+    sortModeSelect.value = savedSettings.sortMode || "nearest";
+
+    function saveTasks() {
+      localStorage.setItem("countdownTasks", JSON.stringify(tasks));
+    }
+
+    function saveSettings() {
+      const settings = {
+        displayMode: displayModeSelect.value,
+        sortMode: sortModeSelect.value
+      };
+      localStorage.setItem("countdownSettings", JSON.stringify(settings));
+    }
+
+    function addTask() {
+      const name = document.getElementById("taskName").value.trim();
+      const date = document.getElementById("taskDate").value;
+      const time = document.getElementById("taskTime").value;
+
+      if (!name || !date || !time) {
+        alert("タスク名・日付・時間を入力してください。");
+        return;
+      }
+
+      const task = {
+        id: Date.now(),
+        name: name,
+        datetime: `${date}T${time}`,
+        createdAt: Date.now(),
+        order: tasks.length
+      };
+
+      tasks.push(task);
+      saveTasks();
+      renderTasks();
+
+      document.getElementById("taskName").value = "";
+      document.getElementById("taskDate").value = "";
+      document.getElementById("taskTime").value = "";
+    }
+
+    function getSortedTasks() {
+      const sortMode = sortModeSelect.value;
+      const copiedTasks = [...tasks];
+
+      if (sortMode === "nearest") {
+        return copiedTasks.sort((a, b) => new Date(a.datetime) - new Date(b.datetime));
+      }
+
+      if (sortMode === "input") {
+        return copiedTasks.sort((a, b) => a.createdAt - b.createdAt);
+      }
+
+      if (sortMode === "custom") {
+        return copiedTasks.sort((a, b) => a.order - b.order);
+      }
+
+      return copiedTasks;
+    }
+
+    function formatRemaining(datetime) {
+      const now = new Date();
+      const target = new Date(datetime);
+      let diffMs = target - now;
+
+      const isPast = diffMs < 0;
+      diffMs = Math.abs(diffMs);
+
+      const totalSeconds = Math.floor(diffMs / 1000);
+
+      const days = Math.floor(totalSeconds / (60 * 60 * 24));
+      const hours = Math.floor((totalSeconds % (60 * 60 * 24)) / (60 * 60));
+      const minutes = Math.floor((totalSeconds % (60 * 60)) / 60);
+      const seconds = totalSeconds % 60;
+
+      const mode = displayModeSelect.value;
+      let text = "";
+
+      if (mode === "date") {
+        text = `${days}日 ${hours}時間 ${minutes}分 ${seconds}秒`;
+      } else {
+        const totalHours = Math.floor(totalSeconds / 3600);
+        text = `${totalHours}時間 ${minutes}分 ${seconds}秒`;
+      }
+
+      return isPast ? `過ぎてから ${text}` : `あと ${text}`;
+    }
+
+    function formatTarget(datetime) {
+      const date = new Date(datetime);
+
+      const y = date.getFullYear();
+      const m = String(date.getMonth() + 1).padStart(2, "0");
+      const d = String(date.getDate()).padStart(2, "0");
+      const h = String(date.getHours()).padStart(2, "0");
+      const min = String(date.getMinutes()).padStart(2, "0");
+
+      return `${y}/${m}/${d} ${h}:${min}`;
+    }
+
+    function renderTasks() {
+      const taskList = document.getElementById("taskList");
+      const sortedTasks = getSortedTasks();
+
+      if (sortedTasks.length === 0) {
+        taskList.innerHTML = `<div class="empty">まだタスクがありません。</div>`;
+        return;
+      }
+
+      taskList.innerHTML = "";
+
+      sortedTasks.forEach((task) => {
+        const row = document.createElement("div");
+        row.className = "task-row";
+
+        const canMove = sortModeSelect.value === "custom";
+
+        row.innerHTML = `
+          <div class="move-buttons">
+            <button class="small-btn secondary" onclick="moveTask(${task.id}, -1)" ${!canMove ? "disabled" : ""}>↑</button>
+            <button class="small-btn secondary" onclick="moveTask(${task.id}, 1)" ${!canMove ? "disabled" : ""}>↓</button>
+          </div>
+
+          <div class="task-name">${escapeHtml(task.name)}</div>
+
+          <div class="made">まで</div>
+
+          <div class="target-time">${formatTarget(task.datetime)}</div>
+
+          <div class="remaining">${formatRemaining(task.datetime)}</div>
+
+          <div class="row-actions">
+            <button class="small-btn secondary" onclick="openEditDialog(${task.id})">編集</button>
+            <button class="small-btn danger" onclick="deleteTask(${task.id})">削除</button>
+          </div>
+        `;
+
+        taskList.appendChild(row);
+      });
+    }
+
+    function openEditDialog(id) {
+      const task = tasks.find(t => t.id === id);
+      if (!task) return;
+
+      editingTaskId = id;
+
+      const [date, time] = task.datetime.split("T");
+
+      document.getElementById("editName").value = task.name;
+      document.getElementById("editDate").value = date;
+      document.getElementById("editTime").value = time;
+
+      document.getElementById("editDialog").showModal();
+    }
+
+    function closeEditDialog() {
+      document.getElementById("editDialog").close();
+      editingTaskId = null;
+    }
+
+    function saveEditTask() {
+      const name = document.getElementById("editName").value.trim();
+      const date = document.getElementById("editDate").value;
+      const time = document.getElementById("editTime").value;
+
+      if (!name || !date || !time) {
+        alert("タスク名・日付・時間を入力してください。");
+        return;
+      }
+
+      const task = tasks.find(t => t.id === editingTaskId);
+      if (!task) return;
+
+      task.name = name;
+      task.datetime = `${date}T${time}`;
+
+      saveTasks();
+      closeEditDialog();
+      renderTasks();
+    }
+
+    function deleteTask(id) {
+      if (!confirm("このタスクを削除しますか？")) return;
+
+      tasks = tasks.filter(t => t.id !== id);
+
+      tasks.forEach((task, index) => {
+        task.order = index;
+      });
+
+      saveTasks();
+      renderTasks();
+    }
+
+    function moveTask(id, direction) {
+      if (sortModeSelect.value !== "custom") return;
+
+      const sortedTasks = getSortedTasks();
+      const index = sortedTasks.findIndex(t => t.id === id);
+      const newIndex = index + direction;
+
+      if (newIndex < 0 || newIndex >= sortedTasks.length) return;
+
+      const temp = sortedTasks[index];
+      sortedTasks[index] = sortedTasks[newIndex];
+      sortedTasks[newIndex] = temp;
+
+      sortedTasks.forEach((task, i) => {
+        const originalTask = tasks.find(t => t.id === task.id);
+        originalTask.order = i;
+      });
+
+      saveTasks();
+      renderTasks();
+    }
+
+    function escapeHtml(text) {
+      return text
+        .replaceAll("&", "&amp;")
+        .replaceAll("<", "&lt;")
+        .replaceAll(">", "&gt;")
+        .replaceAll('"', "&quot;")
+        .replaceAll("'", "&#039;");
+    }
+
+    setInterval(renderTasks, 1000);
+    renderTasks();
+  </script>
+
+</body>
+</html>
